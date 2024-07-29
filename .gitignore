@@ -1,0 +1,8 @@
+node_modules/
+env/
+be_enhanced_spam_detector/be_enhanced_spam_detector/.env
+fe-enhanced-spam-detector/.env
+fe-enhanced-spam-detector/scratch.py
+fe-enhanced-spam-detector/node_modules
+be_enhanced_spam_detector/django_debug.log
+
