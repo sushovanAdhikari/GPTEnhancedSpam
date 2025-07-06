@@ -1,0 +1,33 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle -->
+  <circle cx="16" cy="16" r="15" fill="url(#gradient)" stroke="#4285f4" stroke-width="1.5"/>
+  
+  <!-- Shield base -->
+  <path d="M16 5L21 8V13C21 18 18 22 16 24C14 22 11 18 11 13V8L16 5Z" fill="white" stroke="#4285f4" stroke-width="1"/>
+  
+  <!-- AI brain pattern -->
+  <circle cx="13" cy="12" r="1" fill="#4285f4"/>
+  <circle cx="19" cy="12" r="1" fill="#4285f4"/>
+  <circle cx="16" cy="15" r="1" fill="#4285f4"/>
+  <circle cx="13" cy="18" r="1" fill="#4285f4"/>
+  <circle cx="19" cy="18" r="1" fill="#4285f4"/>
+  
+  <!-- Connection lines -->
+  <path d="M14 13L18 13.5" stroke="#4285f4" stroke-width="0.5" stroke-linecap="round"/>
+  <path d="M18 13L14 13.5" stroke="#4285f4" stroke-width="0.5" stroke-linecap="round"/>
+  <path d="M14 16L18 16.5" stroke="#4285f4" stroke-width="0.5" stroke-linecap="round"/>
+  <path d="M18 16L14 16.5" stroke="#4285f4" stroke-width="0.5" stroke-linecap="round"/>
+  <path d="M14 19L18 19.5" stroke="#4285f4" stroke-width="0.5" stroke-linecap="round"/>
+  <path d="M18 19L14 19.5" stroke="#4285f4" stroke-width="0.5" stroke-linecap="round"/>
+  
+  <!-- Checkmark for security -->
+  <path d="M14.5 21L17.5 24L20 18.5" stroke="#34a853" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  
+  <!-- Gradient definition -->
+  <defs>
+    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4285f4;stop-opacity:0.2"/>
+      <stop offset="100%" style="stop-color:#34a853;stop-opacity:0.2"/>
+    </linearGradient>
+  </defs>
+</svg> 

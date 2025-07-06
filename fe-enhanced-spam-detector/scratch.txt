@@ -1,148 +1,103 @@
-<!DOCTYPE html>
-<html>
-  <head>
-    <title>Gmail API Quickstart</title>
-    <meta charset="utf-8" />
-  </head>
-  <body>
-    <p>Gmail API Quickstart</p>
+# Reduced dataset (458 phishing + 458 legitimate)
+df_email_reduced = pd.concat([df_legitimate_email, df_phishing_email], ignore_index=True)
+df_email_reduced = df_email_reduced.dropna(subset=["body"])
+print(f"Reduced dataset - Legitimate: {len(df_email_reduced[df_email_reduced['label'] == 0])}, Phishing: {len(df_email_reduced[df_email_reduced['label'] == 1])}")
 
-    <!--Add buttons to initiate auth sequence and sign out-->
-    <button id="authorize_button" onclick="handleAuthClick()">Authorize</button>
-    <button id="signout_button" onclick="handleSignoutClick()">Sign Out</button>
+# Original dataset (711 phishing + 458 legitimate)
+df_email_full = pd.concat([df_legitimate_email, df_full_phishing_email], ignore_index=True)
+df_email_full = df_email_full.dropna(subset=["body"])
+print(f"Full dataset - Legitimate: {len(df_email_full[df_email_full['label'] == 0])}, Phishing: {len(df_email_full[df_email_full['label'] == 1])}")
 
-    <pre id="content" style="white-space: pre-wrap;"></pre>
+# Your evaluate_model function (unchanged)
+def evaluate_model(model, tokenizer, texts, true_labels, batch_size=128, max_length=512):
+    predicted_labels, basic_metrics = predict_texts(model, tokenizer, texts, true_labels, batch_size, max_length)
+    if isinstance(true_labels[0], str):
+        label_to_id = {"Legitimate": 0, "Phishing": 1}
+        true_labels = [label_to_id[label] for label in true_labels]
+    precision, recall, f1, support = precision_recall_fscore_support(
+        true_labels, [0 if label == "Legitimate" else 1 for label in predicted_labels], labels=[0, 1]
+    )
+    cm = confusion_matrix(true_labels, [0 if label == "Legitimate" else 1 for label in predicted_labels])
+    detailed_metrics = {
+        'overall': basic_metrics,
+        'per_class': {
+            'Legitimate': {'precision': precision[0], 'recall': recall[0], 'f1': f1[0], 'support': support[0]},
+            'Phishing': {'precision': precision[1], 'recall': recall[1], 'f1': f1[1], 'support': support[1]}
+        },
+        'confusion_matrix': cm.tolist()
+    }
+    return detailed_metrics
 
-    <script type="text/javascript">
-      /* exported gapiLoaded */
-      /* exported gisLoaded */
-      /* exported handleAuthClick */
-      /* exported handleSignoutClick */
-
-      // TODO(developer): Set to client ID and API key from the Developer Console
-      const CLIENT_ID = '<YOUR_CLIENT_ID>';
-      const API_KEY = '<YOUR_API_KEY>';
-
-      // Discovery doc URL for APIs used by the quickstart
-      const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/gmail/v1/rest';
-
-      // Authorization scopes required by the API; multiple scopes can be
-      // included, separated by spaces.
-      const SCOPES = 'https://www.googleapis.com/auth/gmail.readonly';
-
-      let tokenClient;
-      let gapiInited = false;
-      let gisInited = false;
-
-      document.getElementById('authorize_button').style.visibility = 'hidden';
-      document.getElementById('signout_button').style.visibility = 'hidden';
-
-      /**
-       * Callback after api.js is loaded.
-       */
-      function gapiLoaded() {
-        gapi.load('client', initializeGapiClient);
-      }
-
-      /**
-       * Callback after the API client is loaded. Loads the
-       * discovery doc to initialize the API.
-       */
-      async function initializeGapiClient() {
-        await gapi.client.init({
-          apiKey: API_KEY,
-          discoveryDocs: [DISCOVERY_DOC],
-        });
-        gapiInited = true;
-        maybeEnableButtons();
-      }
-
-      /**
-       * Callback after Google Identity Services are loaded.
-       */
-      function gisLoaded() {
-        tokenClient = google.accounts.oauth2.initTokenClient({
-          client_id: CLIENT_ID,
-          scope: SCOPES,
-          callback: '', // defined later
-        });
-        gisInited = true;
-        maybeEnableButtons();
-      }
-
-      /**
-       * Enables user interaction after all libraries are loaded.
-       */
-      function maybeEnableButtons() {
-        if (gapiInited && gisInited) {
-          document.getElementById('authorize_button').style.visibility = 'visible';
+# Your predict_texts function (unchanged)
+def predict_texts(model, tokenizer, texts, true_labels=None, batch_size=128, max_length=512):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = model.to(device)
+    inputs = tokenizer(texts, truncation=True, padding=True, return_tensors="pt", max_length=max_length)
+    dataset = TensorDataset(inputs["input_ids"], inputs["attention_mask"])
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
+    model.eval()
+    all_predictions = []
+    with torch.no_grad():
+        for batch in tqdm(dataloader):
+            batch_input_ids, batch_attention_mask = [t.to(device) for t in batch]
+            outputs = model(input_ids=batch_input_ids, attention_mask=batch_attention_mask)
+            batch_predictions = torch.argmax(outputs.logits, dim=1)
+            all_predictions.append(batch_predictions)
+    all_predictions = torch.cat(all_predictions).cpu().numpy()
+    class_labels = ["Legitimate", "Phishing"]
+    predicted_string_labels = [class_labels[p] for p in all_predictions]
+    metrics = {}
+    if true_labels is not None:
+        true_labels_np = np.array(true_labels)
+        metrics = {
+            'accuracy': accuracy_score(true_labels_np, all_predictions),
+            'precision': precision_recall_fscore_support(true_labels_np, all_predictions, average='binary', pos_label=1, zero_division=0)[0],
+            'recall': precision_recall_fscore_support(true_labels_np, all_predictions, average='binary', pos_label=1, zero_division=0)[1],
+            'f1': precision_recall_fscore_support(true_labels_np, all_predictions, average='binary', pos_label=1, zero_division=0)[2]
         }
-      }
+    return predicted_string_labels, metrics
 
-      /**
-       *  Sign in the user upon button click.
-       */
-      function handleAuthClick() {
-        tokenClient.callback = async (resp) => {
-          if (resp.error !== undefined) {
-            throw (resp);
-          }
-          document.getElementById('signout_button').style.visibility = 'visible';
-          document.getElementById('authorize_button').innerText = 'Refresh';
-          await listLabels();
-        };
+# Evaluate the reduced dataset (458 + 458)
+print("\nEvaluating Reduced Dataset (no credentials)...")
+reduced_metrics = evaluate_model(
+    model=model,
+    tokenizer=tokenizer,
+    texts=df_email_reduced["body"].tolist(),
+    true_labels=df_email_reduced["label"].tolist()
+)
 
-        if (gapi.client.getToken() === null) {
-          // Prompt the user to select a Google Account and ask for consent to share their data
-          // when establishing a new session.
-          tokenClient.requestAccessToken({prompt: 'consent'});
-        } else {
-          // Skip display of account chooser and consent dialog for an existing session.
-          tokenClient.requestAccessToken({prompt: ''});
-        }
-      }
+# Subsample and evaluate the original dataset (711 phishing -> 458 + 458 legitimate)
+n_trials = 20
+subsample_f1_scores = []
+legit_df = df_email_full[df_email_full['label'] == 0]  # Fixed 458 legitimate
+phish_df_full = df_email_full[df_email_full['label'] == 1]  # 711 phishing
 
-      /**
-       *  Sign out the user upon button click.
-       */
-      function handleSignoutClick() {
-        const token = gapi.client.getToken();
-        if (token !== null) {
-          google.accounts.oauth2.revoke(token.access_token);
-          gapi.client.setToken('');
-          document.getElementById('content').innerText = '';
-          document.getElementById('authorize_button').innerText = 'Authorize';
-          document.getElementById('signout_button').style.visibility = 'hidden';
-        }
-      }
+print(f"\nSubsampling {n_trials} times from original dataset...")
+for i in range(n_trials):
+    # Randomly sample 458 phishing emails from 711
+    phish_sample = phish_df_full.sample(n=458, random_state=i)  # Use i as seed for reproducibility
+    subsample_df = pd.concat([legit_df, phish_sample], ignore_index=True)
+    
+    # Evaluate
+    metrics = evaluate_model(
+        model=model,
+        tokenizer=tokenizer,
+        texts=subsample_df["body"].tolist(),
+        true_labels=subsample_df["label"].tolist()
+    )
+    subsample_f1_scores.append(metrics['overall']['f1'])
+    print(f"Trial {i+1}/{n_trials} - F1: {metrics['overall']['f1']:.4f}")
 
-      /**
-       * Print all Labels in the authorized user's inbox. If no labels
-       * are found an appropriate message is printed.
-       */
-      async function listLabels() {
-        let response;
-        try {
-          response = await gapi.client.gmail.users.labels.list({
-            'userId': 'me',
-          });
-        } catch (err) {
-          document.getElementById('content').innerText = err.message;
-          return;
-        }
-        const labels = response.result.labels;
-        if (!labels || labels.length == 0) {
-          document.getElementById('content').innerText = 'No labels found.';
-          return;
-        }
-        // Flatten to string to display
-        const output = labels.reduce(
-            (str, label) => `${str}${label.name}\n`,
-            'Labels:\n');
-        document.getElementById('content').innerText = output;
-      }
-    </script>
-    <script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
-    <script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
-  </body>
-</html>
+# Compute average and standard deviation
+subsample_mean_f1 = np.mean(subsample_f1_scores)
+subsample_std_f1 = np.std(subsample_f1_scores)
+
+# Print results
+print("\nResults:")
+print(f"Reduced Dataset (458 phishing, no credentials) - F1: {reduced_metrics['overall']['f1']:.4f}")
+print(f"Subsampled Original (458 phishing, with credentials) - Mean F1: {subsample_mean_f1:.4f} ± {subsample_std_f1:.4f}")
+
+# Optional: Basic statistical comparison (t-test)
+from scipy.stats import ttest_ind
+t_stat, p_value = ttest_ind(subsample_f1_scores, [reduced_metrics['overall']['f1']] * n_trials, equal_var=False)
+print(f"\nT-test p-value: {p_value:.4f} (significant if < 0.05)")

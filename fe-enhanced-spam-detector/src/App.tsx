@@ -13,6 +13,7 @@ function App() {
       <Routes>
         <Route path='/' element={<LogIn />} />
         <Route path="/redirect" element={<RedirectHandler />} /> {/* Redirect route */}
+        <Route path="/dashboard" element={<RedirectHandler />} /> {/* Dashboard route */}
       </Routes>
     </Router>
 

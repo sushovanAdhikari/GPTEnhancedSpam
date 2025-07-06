@@ -13,9 +13,9 @@ const clientId = process.env.REACT_APP_GOOGLE_CLIENT_ID || 'default-client-id';
 
 root.render(
   <GoogleOAuthProvider clientId={clientId}>
-  <React.StrictMode>
+  {/* <React.StrictMode> */}
       <App />
-  </React.StrictMode>
+  {/* </React.StrictMode> */}
   </GoogleOAuthProvider>
 );
 

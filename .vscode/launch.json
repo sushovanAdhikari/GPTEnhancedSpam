@@ -8,13 +8,13 @@
             "name": "Python Debugger: Django",
             "type": "debugpy",
             "request": "launch",
-            "python": "${workspaceFolder}/../env/bin/python",
-            "program": "${workspaceFolder}/manage.py",
+            "python": "${workspaceFolder}/env/bin/python",
+            "program": "${workspaceFolder}/be_enhanced_spam_detector/manage.py",
             "args": [
                 "runserver"
             ],
             "django": true,
-            "justMyCode": false
+            // "justMyCode": false
         }
     ]
 }

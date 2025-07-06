@@ -70,8 +70,6 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'be_enhanced_spam_detector.urls'
 
-SECRET_KEY = 'your-secret-key'
-
 
 AUTHENTICATION_BACKENDS = (
     'django.contrib.auth.backends.ModelBackend',
@@ -125,11 +123,13 @@ WSGI_APPLICATION = 'be_enhanced_spam_detector.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
+print('USER: {user}, Password: {pwd}, Host: {host}, Port: {port}'.format(user=env('DB_USER'), pwd=env('PASSWORD'), host=env('HOST'), port=env('PORT')))
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
         'NAME': 'GPT-ENHANCEDSPAM',
-        'USER': env('USER'),
+        'USER': env('DB_USER'),
         'PASSWORD': env('PASSWORD'),
         'HOST': env('HOST'),
         'PORT': env('PORT'),

@@ -9,11 +9,12 @@ from .jwt_utils import create_jwt_token, decode_jwt_token
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from requests.exceptions import HTTPError, Timeout, RequestException
+from handle_gmail.utilities import parse_email_data, service_gmail
 import requests
-
+import json
 
 @method_decorator(csrf_exempt, name='dispatch')
-class GoogleLogin(APIView):
+class GmailOAuth(APIView):
     '''
     Handle Google OAuth2 login requests.
 
@@ -39,24 +40,47 @@ class GoogleLogin(APIView):
         else:
             return {'error': 'Failed to fetch user information'}
         
+    def refresh_access_token(self, refresh_token, token_type='basic'):
+        """
+        Use refresh token to get new access token from Google
+        """
+        token_url = 'https://oauth2.googleapis.com/token'
+        payload = {
+            'refresh_token': refresh_token,
+            'client_id': settings.GOOGLE_CLIENT_ID,
+            'client_secret': settings.GOOGLE_CLIENT_SECRET,
+            'grant_type': 'refresh_token',
+        }
+        
+        try:
+            response = requests.post(token_url, data=payload)
+            response.raise_for_status()
+            tokens = response.json()
+            
+            # Google might not return a new refresh token, so preserve the old one
+            if 'refresh_token' not in tokens:
+                tokens['refresh_token'] = refresh_token
+                
+            return tokens
+        except RequestException as req_err:
+            print(f'Refresh token error: {req_err}')
+            raise ValueError(f'Failed to refresh token: {req_err}')
+        
 
-    
-    import requests
+    # def validate_token(self, access_token):
+    #     token_info_url = 'https://www.googleapis.com/oauth2/v3/tokeninfo'
+    #     params = {'access_token': access_token}
 
-    def validate_token(self, access_token):
-        token_info_url = 'https://www.googleapis.com/oauth2/v3/tokeninfo'
-        params = {'access_token': access_token}
+    #     response = requests.get(token_info_url, params=params)
 
-        response = requests.get(token_info_url, params=params)
-
-        if response.status_code == 200:
-            token_info = response.json()
-            print("Token Info:", token_info)
-            return token_info
-        else:
-            print(f"Error validating token: {response.status_code}")
-            print(f"Response content: {response.text}")
-            return None
+    #     if response.status_code == 200:
+    #         token_info = response.json()
+    #         print("Token Info:", token_info)
+    #         return token_info
+    #     else:
+    #         print(f"Error validating token: {response.status_code}")
+    #         print(f"Response content: {response.text}")
+    #         return None
         
     
     def create_or_update_user(self, user_info):
@@ -70,30 +94,28 @@ class GoogleLogin(APIView):
             email=email,
             defaults={'username': user_id, 'first_name': name}
         )
-        
         return user
 
 
-
-    def exchange_code_with_token(self, authoization_code):
+    def exchange_code_with_token(self, authorization_code):  # Fixed typo
         token_url = 'https://oauth2.googleapis.com/token'
         payload = {
-            'code': authoization_code,
+            'code': authorization_code,
             'client_id': settings.GOOGLE_CLIENT_ID,
             'client_secret': settings.GOOGLE_CLIENT_SECRET,
             'redirect_uri': 'http://localhost:3000/redirect',
-            'grant_type': 'authorization_code'
+            'grant_type': 'authorization_code',
         }
         try:
             response = requests.post(token_url, data=payload)
             response.raise_for_status()
             tokens = response.json()
+            print(f"Full token response: {tokens}")  # Log the entire response
             return tokens
         except RequestException as req_err:
             print(f'Request error occurred: {req_err}')
             return {'error': f'Request error occurred: {req_err}'}
       
-
     def post(self, request):
         '''
         Handle POST requests for Google OAuth2 login.
@@ -104,95 +126,73 @@ class GoogleLogin(APIView):
         Returns:
             Response: A DRF Response object containing the JWT tokens or an error message.
         '''
-        authorization_code = request.data.get('authorization_code')
+        action = request.data.get('action')
 
-        if not authorization_code:
-            return Response({'error': 'Access token is required'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        try:
-            tokens = self.exchange_code_with_token(authorization_code)
+        if action == 'login':
+            code = request.data.get('code')
+            if not code:
+                return Response({'error': 'Access token is required'}, status=status.HTTP_400_BAD_REQUEST)
+            try:
+                google_tokens = self.exchange_code_with_token(code)
+                access_token = google_tokens['access_token']
 
-            access_token = tokens['access_token']
-            # validate_token = self.validate_token(access_token)
-            user_info = self.get_user_info(access_token)
-            user = self.create_or_update_user(user_info)
+                user_info = self.get_user_info(access_token)
+                user = self.create_or_update_user(user_info)
 
-            # Create JWT token
-            jwt_token = create_jwt_token(user_id=user)
-            result = list_emails(access_token)
-            if 'error' in result:
-                # Handle the error (log, notify user, etc.)
-                print(f"Error: {result['error']}")
-                print(f"Details: {result['details']}")
-                # You can raise an exception or handle the error based on your application's needs
-            else:
-                # Process the successful result
-                emails = result
-                print("Emails fetched successfully:")
-                print(emails)
+                # Create JWT token
+                jwt_token = create_jwt_token(user_id=user)
+                # emails = service_gmail(access_token)
 
-                for email in emails:
-                    get_email_details(access_token, email)
-
-
+                return Response({
+                    'access_token' : google_tokens['access_token'],
+                    'expires_in' : google_tokens['expires_in'],
+                    'refresh_token' : google_tokens['refresh_token'],
+                    'jwt_token': jwt_token,
+                })
+            except ValueError as e:
+                # Return error response if token is invalid or expired
+                return Response({'error': 'Token is invalid or expired'}, status=status.HTTP_400_BAD_REQUEST)
+            except Exception as e:
+                return Response({'error': 'An unexpected error occurred'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+        elif action == 'exchange_gmail_token':
+            code = request.data.get('code')
+            google_tokens = self.exchange_code_with_token(code)
+            access_token = google_tokens['access_token']
             return Response({
-                'access_token': access_token,
-                #start working here
-                # 'refresh_token': refresh_token,
-                'token': jwt_token,
-                'emails': emails
-            })
-        except ValueError as e:
-            # Return error response if token is invalid or expired
-            return Response({'error': 'Token is invalid or expired'}, status=status.HTTP_400_BAD_REQUEST)
-
-
-
-def list_emails(access_token):
-    # Define the endpoint URL for listing emails
-    url = 'https://www.googleapis.com/gmail/v1/users/me/messages'
-    
-    # Set up the headers with the access token
-    headers = {
-        'Authorization': f'Bearer {access_token}',
-        'Accept': 'application/json'
-    }
-
-    params = {
-        'maxResults': 30
-    }
-    
-    try:
-        # Make the request to fetch the email list
-        response = requests.get(url, headers=headers, params=params)
+                    'access_token' : google_tokens['access_token'],
+                    'expires_in' : google_tokens['expires_in'],
+                    'refresh_token' : google_tokens['refresh_token'],
+                })
         
-        # Handle the response
-        if response.status_code == 200:
-            # Successfully retrieved the email list
-            emails = response.json()
-            return emails
+        elif action == 'retrieve_gmail':
+            auth_header = request.META.get('HTTP_AUTHORIZATION')
+            if auth_header and auth_header.startswith('Bearer '):
+                access_token = auth_header.split(' ')[1]
+                emails = service_gmail(access_token)
+                return Response({
+                    'gmails': emails
+                })
+            else:
+                return Response({'error': 'Bearer Token was not provided.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        elif action == 'refresh_token':
+            refresh_token = request.data.get('refresh_token')
+            token_type = request.data.get('token_type', 'basic')  # 'basic' or 'gmail'
+            if not refresh_token:
+                return Response({'error': 'Refresh token is required'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            try:
+                new_tokens = self.refresh_access_token(refresh_token, token_type)
+                return Response({
+                    'access_token': new_tokens['access_token'],
+                    'expires_in': new_tokens.get('expires_in', 3600),
+                    'refresh_token': new_tokens['refresh_token'],
+                    'token_type': token_type
+                })
+            except ValueError as e:
+                return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            except Exception as e:
+                return Response({'error': 'Failed to refresh token'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         else:
-            # Handle errors
-            return {'error': 'Failed to fetch emails', 'details': response.json()}
-    
-    except requests.RequestException as e:
-        # Handle exceptions
-        return {'error': 'Request failed', 'details': str(e)}
-    
-
-def get_email_details(access_token, message_id):
-    url = f'https://www.googleapis.com/gmail/v1/users/me/messages/{message_id}'
-    
-    headers = {
-        'Authorization': f'Bearer {access_token}',
-        'Accept': 'application/json'
-    }
-    
-    try:
-        response = requests.get(url, headers=headers)
-        if response.status_code == 200:
-            return response.json()
-        else:
-            return {'error': 'Failed to fetch email details', 'details': response.json()}
-    except requests.RequestException as e:
-        return {'error': 'Request failed', 'details': str(e)}
+            return Response({'error': 'Invalid action'}, status=status.HTTP_400_BAD_REQUEST)

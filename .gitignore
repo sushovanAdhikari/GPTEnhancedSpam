@@ -5,4 +5,5 @@ fe-enhanced-spam-detector/.env
 fe-enhanced-spam-detector/scratch.py
 fe-enhanced-spam-detector/node_modules
 be_enhanced_spam_detector/django_debug.log
-
+be_enhanced_spam_detector/.DS_Store
+fe-enhanced-spam-detector/build/
