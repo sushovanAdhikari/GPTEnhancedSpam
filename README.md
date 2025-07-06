@@ -259,9 +259,6 @@ GPTEnhancedSpam/
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## 📝 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 🙏 Acknowledgments
 
@@ -270,17 +267,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - React and TypeScript for modern frontend development
 - PostgreSQL for reliable data storage
 
-## 📞 Support
-
-If you encounter any issues or have questions:
-
-1. Check the [Issues](https://github.com/your-username/your-repo/issues) page
-2. Create a new issue with detailed description
-3. Contact the development team
-
----
-
-<div align="center">
-  <p>Built with ❤️ for secure email communication</p>
-  <p><strong>AI Guard</strong> - Protecting your inbox, one email at a time</p>
-</div> 
