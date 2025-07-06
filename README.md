@@ -1,8 +1,8 @@
-# AI Guard - Enhanced Spam Detection System
+# AI Phish Guard - Enhanced Spam Detection System
 
 <div align="center">
   <img src="fe-enhanced-spam-detector/public/ai-guard-logo-large.svg" alt="AI Guard Logo" width="120" height="120">
-  <h1>AI Guard</h1>
+  <h1>AI Phish Guard</h1>
   <p><strong>Your intelligent shield against email threats</strong></p>
   <p>Advanced AI-powered detection for phishing, spam, and malicious content with seamless Gmail integration.</p>
 </div>
